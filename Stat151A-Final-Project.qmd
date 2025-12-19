@@ -21,7 +21,7 @@ wvs <- read_csv("WVS_Cross-National_Wave_7_csv_v6_0.csv")
 ### LASSO Variable Selection
 
 ```{r}
-# subset variables
+# variables
 life_satisfaction = wvs["Q49"]
 questions <- wvs %>% select(starts_with("Q"), -Q49)
 
@@ -32,13 +32,29 @@ wvs_clean <- na.omit(cbind(life_satisfaction, questions))
 y <- wvs_clean[, 1]
 X <- as.matrix(wvs_clean[, -1])
 
-# LASSO
-lasso_model <- glmnet(X, y, alpha = 1)
-cv_lasso <- cv.glmnet(X, y, alpha = 1)
-best_lambda <- cv_lasso$lambda.min
-coef(cv_lasso, s = "lambda.min")
+#split training and test data
+set.seed(123)
+n <- nrow(X)
+train_indices <- sample(1:n, size = round(0.7 * n))
+X_train <- X[train_indices, ]
+y_train <- y[train_indices]
+X_test <- X[-train_indices, ]
+y_test <- y[-train_indices]
 
-# he also suggested prediction intervals
+# LASSO
+cv_lasso <- cv.glmnet(X_train, y_train, alpha = 1)
+best_lambda <- cv_lasso$lambda.1se
+lasso_coefficients = coef(cv_lasso, s = "lambda.1se")
+
+coef_df <- as.data.frame(as.matrix(lasso_coefficients))
+coef_df$Question <- rownames(coef_df)
+names(coef_df)[1] <- "Coefficient"
+
+selected_vars <- coef_df[coef_df$Coefficient != 0, ]
+selected_vars
+
+# he also suggested prediction intervals (maybe meant if we went in the coefficient estimation direction?)
+
 ```
 
 ### Proportional Odds Model
