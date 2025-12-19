@@ -10,16 +10,33 @@ editor: visual
 # libraries/packages (ADD MORE depending on how we do rest of analysis)
 library(readr)
 library(MASS)
-
+install.packages("glmnet")
+library(glmnet)
+library(dplyr)
 
 # WVS data
 wvs <- read_csv("WVS_Cross-National_Wave_7_csv_v6_0.csv")
 ```
 
-### Variable Selection
+### LASSO Variable Selection
 
 ```{r}
-# start with ALL variables, then use ridge or LASSO to select most important ones as opposed to hand-picked (maybe compare to hand-picked model and discuss in write-up)
+# subset variables
+life_satisfaction = wvs["Q49"]
+questions <- wvs %>% select(starts_with("Q"), -Q49)
+
+# remove NA values
+wvs_clean <- na.omit(cbind(life_satisfaction, questions))
+
+# X as matrix, Y as vector
+y <- wvs_clean[, 1]
+X <- as.matrix(wvs_clean[, -1])
+
+# LASSO
+lasso_model <- glmnet(X, y, alpha = 1)
+cv_lasso <- cv.glmnet(X, y, alpha = 1)
+best_lambda <- cv_lasso$lambda.min
+coef(cv_lasso, s = "lambda.min")
 
 # he also suggested prediction intervals
 ```
