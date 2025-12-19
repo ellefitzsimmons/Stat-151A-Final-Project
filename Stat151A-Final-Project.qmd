@@ -26,6 +26,7 @@ questions <- wvs %>% select(starts_with("Q"), -Q49)
 
 # remove NA values
 wvs_clean <- na.omit(cbind(life_satisfaction, questions))
+wvs_clean <- wvs_clean %>% filter(Q49 >= 1 & Q49 <= 10)
 
 # X as matrix, Y as vector
 y <- wvs_clean$Q49
@@ -53,7 +54,13 @@ selected_vars <- coef_df[coef_df$Coefficient != 0, ]
 selected_vars
 
 # he also suggested prediction intervals (maybe meant if we went in the coefficient estimation direction?)
+```
 
+### Quick Check on Life Satisfaction
+
+```{r}
+table(wvs_clean$Q49)
+hist(wvs_clean$Q49)
 ```
 
 ### Fitting Models
@@ -111,6 +118,42 @@ data.frame(
   Mean_Absolute_Error = c(mae_lm, mae_po),
   Root_Mean_Square_Error = c(rmse_lm, rmse_po)
 )
+```
+
+Hunch that the intermediate values from lm is giving it better metrics than the proportional odds model which is forced to round to an integer.
+
+### Evaluate on Test Set (pt 2)
+
+```{r}
+# try using expected value (continuous) instead of mode
+pred_po_probs <- predict(po, newdata = test_data, type = "probs")
+pred_po_expected <- as.numeric(pred_po_probs %*% 1:10)
+
+mae_po_expected <- mean(abs(pred_po_expected - test_data$Q49))
+rmse_po_expected <- sqrt(mean((pred_po_expected - test_data$Q49)^2))
+
+# display comparison
+data.frame(
+  Model = c("Linear", "Proportional Odds"),
+  Mean_Absolute_Error = c(mae_lm, mae_po_expected),
+  Root_Mean_Square_Error = c(rmse_lm, rmse_po_expected)
+)
+```
+
+This is better but still bad, let's check proportional odds assumptions with brant test. Warning: this takes forever to run.
+
+```{r}
+library(brant)
+brant(po)
+```
+
+Findings: assumptions hold for neither model
+
+### Fitting Multinomial Logit
+
+```{r}
+library(nnet)
+model_multinom <- multinom(factor(Q49) ~ ., data = train_data, maxit = 500)
 ```
 
 ### Sensitivity Analyses
