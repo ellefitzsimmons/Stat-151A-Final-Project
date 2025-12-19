@@ -10,12 +10,11 @@ editor: visual
 # libraries/packages (ADD MORE depending on how we do rest of analysis)
 library(readr)
 library(MASS)
-install.packages("glmnet")
 library(glmnet)
 library(dplyr)
 
 # WVS data
-wvs <- read_csv("WVS_Cross-National_Wave_7_csv_v6_0.csv")
+wvs <- read_csv("Resources/WVS_Cross-National_Wave_7_csv_v6_0.csv")
 ```
 
 ### LASSO Variable Selection
@@ -29,7 +28,7 @@ questions <- wvs %>% select(starts_with("Q"), -Q49)
 wvs_clean <- na.omit(cbind(life_satisfaction, questions))
 
 # X as matrix, Y as vector
-y <- wvs_clean[, 1]
+y <- wvs_clean$Q49
 X <- as.matrix(wvs_clean[, -1])
 
 #split training and test data
@@ -57,10 +56,61 @@ selected_vars
 
 ```
 
-### Proportional Odds Model
+### Fitting Models
 
 ```{r}
-# as opposed to linear (maybe compare predictive accuracy to linear model and discuss in writeup)
+# May not ever need intercept, consider removing it from selected_vars entirely
+selected_var_names <- selected_vars$Question[selected_vars$Question != "(Intercept)"]
+
+# create training and test dataframes
+train_data <- data.frame(
+  Q49 = y_train,
+  X_train[, selected_var_names]
+)
+
+test_data <- data.frame(
+  Q49 = y_test,
+  X_test[, selected_var_names]
+)
+
+# fit model 1: Linear Regression
+lm <- lm(Q49 ~ ., data = train_data)
+
+# fit model 2: Proportional Odds
+po <- polr(factor(Q49) ~ ., data = train_data)
+
+#summarize optional, output is very long
+```
+
+### Diagnostics
+
+```{r}
+# Linear model diagnostics
+par(mfrow = c(2, 2))
+plot(lm)
+par(mfrow = c(1, 1))
+```
+
+### Evaluate on Test Set
+
+```{r}
+# predictions
+pred_lm <- predict(lm, newdata = test_data)
+pred_po <- as.numeric(as.character(predict(po, newdata = test_data)))
+
+# metrics
+mae_lm <- mean(abs(pred_lm - test_data$Q49))
+mae_po <- mean(abs(pred_po - test_data$Q49))
+
+rmse_lm <- sqrt(mean((pred_lm - test_data$Q49)^2))
+rmse_po <- sqrt(mean((pred_po - test_data$Q49)^2))
+
+# display comparison
+data.frame(
+  Model = c("Linear", "Proportional Odds"),
+  Mean_Absolute_Error = c(mae_lm, mae_po),
+  Root_Mean_Square_Error = c(rmse_lm, rmse_po)
+)
 ```
 
 ### Sensitivity Analyses
