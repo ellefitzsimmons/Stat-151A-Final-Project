@@ -14,10 +14,10 @@ library(glmnet)
 library(dplyr)
 
 # WVS data
-wvs <- read_csv("Resources/WVS_Cross-National_Wave_7_csv_v6_0.csv")
+wvs <- read_csv("WVS_Cross-National_Wave_7_csv_v6_0.csv")
 ```
 
-### LASSO Variable Selection
+### Clean Data & Subset Variables
 
 ```{r}
 # variables
@@ -40,7 +40,32 @@ X_train <- X[train_indices, ]
 y_train <- y[train_indices]
 X_test <- X[-train_indices, ]
 y_test <- y[-train_indices]
+```
 
+### Original Model (linear, manual variable selection)
+
+```{r}
+# manually selected variables
+original_predictors = c("Q50","Q52","Q71","Q94","Q95","Q96","Q101", 
+                  "Q112","Q131","Q142","Q143","Q146","Q148","Q164",
+                  "Q166","Q167","Q182","Q240","Q249","Q251","Q260",
+                  "Q262","Q263","Q264","Q265","Q269","Q270","Q271",
+                  "Q273","Q274","Q275")
+
+# training data frame w/ selected variables
+train_data <- wvs_clean[train_indices, ]
+
+original_lm_data <- train_data[, c("Q49", original_predictors)]
+
+# fit linear model
+original_lm <- lm(Q49 ~ ., data = original_lm_data)
+```
+
+outlined in proposal, selected variables based on relevance, removing probable highly-correlated pairs
+
+### LASSO Variable Selection
+
+```{r}
 # LASSO
 cv_lasso <- cv.glmnet(X_train, y_train, alpha = 1)
 best_lambda <- cv_lasso$lambda.1se
@@ -102,21 +127,24 @@ par(mfrow = c(1, 1))
 
 ```{r}
 # predictions
+pred_orig_lm <- predict(original_lm, newdata = as.data.frame(X_test[, original_predictors]))
 pred_lm <- predict(lm, newdata = test_data)
 pred_po <- as.numeric(as.character(predict(po, newdata = test_data)))
 
 # metrics
+mae_orig_lm <- mean(abs(pred_orig_lm - test_data$Q49))
 mae_lm <- mean(abs(pred_lm - test_data$Q49))
 mae_po <- mean(abs(pred_po - test_data$Q49))
 
+rmse_orig_lm <- sqrt(mean((pred_orig_lm - test_data$Q49)^2))
 rmse_lm <- sqrt(mean((pred_lm - test_data$Q49)^2))
 rmse_po <- sqrt(mean((pred_po - test_data$Q49)^2))
 
 # display comparison
 data.frame(
-  Model = c("Linear", "Proportional Odds"),
-  Mean_Absolute_Error = c(mae_lm, mae_po),
-  Root_Mean_Square_Error = c(rmse_lm, rmse_po)
+  Model = c("Original Linear (manual variable selection)", "Linear (LASSO)", "Proportional Odds"),
+  Mean_Absolute_Error = c(mae_orig_lm, mae_lm, mae_po),
+  Root_Mean_Square_Error = c(rmse_lm, rmse_lm, rmse_po)
 )
 ```
 
@@ -134,13 +162,13 @@ rmse_po_expected <- sqrt(mean((pred_po_expected - test_data$Q49)^2))
 
 # display comparison
 data.frame(
-  Model = c("Linear", "Proportional Odds"),
-  Mean_Absolute_Error = c(mae_lm, mae_po_expected),
-  Root_Mean_Square_Error = c(rmse_lm, rmse_po_expected)
+  Model = c("Original Linear (manual variable selection)", "Linear (LASSO)", "Proportional Odds"),
+  Mean_Absolute_Error = c(mae_orig_lm, mae_lm, mae_po_expected),
+  Root_Mean_Square_Error = c(rmse_orig_lm, rmse_lm, rmse_po_expected)
 )
 ```
 
-This is better but still bad, let's check proportional odds assumptions with brant test. Warning: this takes forever to run.
+These results indicate that the original linear model (manual variable selection) is a worse fit compared to the other two, which are still very similar. This is better but still bad, let's check proportional odds assumptions with brant test. Warning: this takes forever to run.
 
 ```{r}
 library(brant)
@@ -194,6 +222,8 @@ The output follows the above trends. We choose the **Linear Regression** model a
 ### Sensitivity Analyses
 
 ```{r}
+# use privacy and interest to conduct sensitivity analyses / check robustness of results
+
 library(glmnet)
 library(dplyr)
 
@@ -292,5 +322,4 @@ if (length(sens_in_data) > 0) {
 } else {
   data.frame(model = "All variables", full_perf)
 }
-# use privacy and interest to conduct sensitivity analyses / check robustness of results
 ```
