@@ -77,8 +77,6 @@ names(coef_df)[1] <- "Coefficient"
 
 selected_vars <- coef_df[coef_df$Coefficient != 0, ]
 selected_vars
-
-# he also suggested prediction intervals (maybe meant if we went in the coefficient estimation direction?)
 ```
 
 ### Quick Check on Life Satisfaction
@@ -144,7 +142,11 @@ rmse_po <- sqrt(mean((pred_po - test_data$Q49)^2))
 data.frame(
   Model = c("Original Linear (manual variable selection)", "Linear (LASSO)", "Proportional Odds"),
   Mean_Absolute_Error = c(mae_orig_lm, mae_lm, mae_po),
+<<<<<<< HEAD
   Root_Mean_Square_Error = c(rmse_lm, rmse_lm, rmse_po)
+=======
+  Root_Mean_Square_Error = c(rmse_orig_lm, rmse_lm, rmse_po)
+>>>>>>> b76ef39 (Save my current progress)
 )
 ```
 
