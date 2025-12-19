@@ -14,7 +14,7 @@ library(glmnet)
 library(dplyr)
 
 # WVS data
-wvs <- read_csv("WVS_Cross-National_Wave_7_csv_v6_0.csv")
+wvs <- read_csv("Resources/WVS_Cross-National_Wave_7_csv_v6_0.csv")
 ```
 
 ### Clean Data & Subset Variables
@@ -142,11 +142,7 @@ rmse_po <- sqrt(mean((pred_po - test_data$Q49)^2))
 data.frame(
   Model = c("Original Linear (manual variable selection)", "Linear (LASSO)", "Proportional Odds"),
   Mean_Absolute_Error = c(mae_orig_lm, mae_lm, mae_po),
-<<<<<<< HEAD
-  Root_Mean_Square_Error = c(rmse_lm, rmse_lm, rmse_po)
-=======
   Root_Mean_Square_Error = c(rmse_orig_lm, rmse_lm, rmse_po)
->>>>>>> b76ef39 (Save my current progress)
 )
 ```
 
@@ -222,9 +218,72 @@ data.frame(
 The output follows the above trends. We choose the **Linear Regression** model as it's the cheaper of the two models.
 
 ### Sensitivity Analyses
+#### E and F (Privacy and Interest)
+```{r}
+# Clean wvs
+sensitivity_vars <- c("Q49", selected_var_names, "E_RESPINT", "F_INTPRIVACY")
+
+wvs_sensitivity <- wvs[, sensitivity_vars]
+
+wvs_sensitivity_clean <- na.omit(wvs_sensitivity)
+
+# Check what E and F look like
+cat("E_RESPINT (Respondent Interest) distribution:\n")
+table(wvs_sensitivity_clean$E_RESPINT)
+
+cat("\nF_INTPRIVACY (Interview Privacy) distribution:\n")
+table(wvs_sensitivity_clean$F_INTPRIVACY)
+```
+Let's say E_RESPINT = 1,2 and F_INTPRIVACY = 1 are high quality values.
 
 ```{r}
-# use privacy and interest to conduct sensitivity analyses / check robustness of results
+# create train and test split
+n <- nrow(wvs_sensitivity_clean)
+train_indices_sens <- sample(1:n, size = round(0.7 * n))
+
+train_sens <- wvs_sensitivity_clean[train_indices_sens, ]
+test_sens <- wvs_sensitivity_clean[-train_indices_sens, ]
+
+# filter to high quality values only
+train_high <- train_sens[train_sens$E_RESPINT >= 0 & 
+                         train_sens$E_RESPINT <= 2 &
+                         train_sens$F_INTPRIVACY == 1, ]
+
+test_high <- test_sens[test_sens$E_RESPINT >= 0 & 
+                       test_sens$E_RESPINT <= 2 &
+                       test_sens$F_INTPRIVACY == 1, ]
+
+# Remove E and F from predictors
+predictor_vars <- setdiff(names(train_sens), c("Q49", "E_RESPINT", "F_INTPRIVACY"))
+
+# fit models
+lm_full <- lm(Q49 ~ ., data = train_sens[, c("Q49", predictor_vars)])
+
+lm_high <- lm(Q49 ~ ., data = train_high[, c("Q49", predictor_vars)])
+
+# Predict
+pred_full <- predict(lm_full, newdata = test_sens)
+mae_full <- mean(abs(pred_full - test_sens$Q49))
+rmse_full <- sqrt(mean((pred_full - test_sens$Q49)^2))
+
+pred_high <- predict(lm_high, newdata = test_high)
+mae_high <- mean(abs(pred_high - test_high$Q49))
+rmse_high <- sqrt(mean((pred_high - test_high$Q49)^2))
+
+# display
+data.frame(
+  Dataset = c("All Responses", "High Quality Only"),
+  N_train = c(nrow(train_sens), nrow(train_high)),
+  N_test = c(nrow(test_sens), nrow(test_high)),
+  MAE = c(mae_full, mae_high),
+  RMSE = c(rmse_full, rmse_high)
+)
+```
+Slight improvement with "high-quality" data, but the inclusion of lower-quality responses does not substantially degrade the model accuracy. This supports the validity of using the full dataset for final predictions.
+
+#### General Robustness
+```{r}
+# conduct sensitivity analyses / check robustness of results
 
 library(glmnet)
 library(dplyr)
