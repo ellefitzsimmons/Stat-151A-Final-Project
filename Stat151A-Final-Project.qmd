@@ -149,12 +149,47 @@ brant(po)
 
 Findings: assumptions hold for neither model
 
-### Fitting Multinomial Logit
+### 10-Fold CV
 
 ```{r}
-library(nnet)
-model_multinom <- multinom(factor(Q49) ~ ., data = train_data, maxit = 500)
+k <- 10
+folds <- sample(1:k, nrow(train_data), replace = TRUE)
+
+cv_errors_lm <- numeric(k)
+cv_errors_po <- numeric(k)
+
+for(i in 1:k) {
+  # split
+  cv_train <- train_data[folds != i, ]
+  cv_valid <- train_data[folds == i, ]
+  
+  # Fit
+  fit_lm <- lm(Q49 ~ ., data = cv_train)
+  fit_po <- polr(factor(Q49) ~ ., data = cv_train)
+  
+  # predict
+  pred_lm <- predict(fit_lm, newdata = cv_valid)
+  pred_po_probs <- predict(fit_po, newdata = cv_valid, type = "probs")
+  pred_po <- as.numeric(pred_po_probs %*% 1:10)
+  
+  # calculate errors
+  cv_errors_lm[i] <- mean((pred_lm - cv_valid$Q49)^2)
+  cv_errors_po[i] <- mean((pred_po - cv_valid$Q49)^2)
+}
+
+# Results
+cv_rmse_lm <- sqrt(mean(cv_errors_lm))
+cv_rmse_po <- sqrt(mean(cv_errors_po))
+
+# Compare
+data.frame(
+  Model = c("Linear", "Proportional Odds"),
+  Test_RMSE = c(1.642, 1.649),
+  CV_RMSE = c(cv_rmse_lm, cv_rmse_po)
+)
 ```
+
+The output follows the above trends. We choose the **Linear Regression** model as it's the cheaper of the two models.
 
 ### Sensitivity Analyses
 
